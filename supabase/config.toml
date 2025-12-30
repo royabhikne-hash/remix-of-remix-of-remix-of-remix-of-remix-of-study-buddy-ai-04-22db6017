@@ -1,7 +1,1 @@
-project_id = "elkimdndmvrtolmbwbct"
-
-[functions.study-chat]
-verify_jwt = false
-
-[functions.send-weekly-report]
-verify_jwt = false
+project_id = "xyjedqpwmxubdtylkblq"

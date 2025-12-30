@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
 import {
   X,
   TrendingUp,
@@ -15,6 +17,7 @@ import {
   MessageCircle,
   FileText,
   Loader2,
+  Download,
 } from "lucide-react";
 
 interface StudentReportModalProps {
@@ -56,9 +59,11 @@ const StudentReportModal = ({
   studentPhoto,
   studentClass,
 }: StudentReportModalProps) => {
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [quizzes, setQuizzes] = useState<QuizData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     if (isOpen && studentId) {
@@ -170,6 +175,203 @@ const StudentReportModal = ({
     });
   };
 
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      let yPos = 20;
+      const lineHeight = 7;
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+
+      // Helper function to add new page if needed
+      const checkPageBreak = (requiredSpace: number) => {
+        if (yPos + requiredSpace > pdf.internal.pageSize.getHeight() - 20) {
+          pdf.addPage();
+          yPos = 20;
+        }
+      };
+
+      // Title
+      pdf.setFontSize(20);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Student Progress Report", pageWidth / 2, yPos, { align: "center" });
+      yPos += 10;
+
+      // Subtitle
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Edu Improvement AI", pageWidth / 2, yPos, { align: "center" });
+      yPos += 15;
+
+      // Student Info
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(studentName, margin, yPos);
+      yPos += lineHeight;
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Class: ${studentClass}`, margin, yPos);
+      yPos += lineHeight;
+      pdf.text(`Report Date: ${new Date().toLocaleDateString("en-IN")}`, margin, yPos);
+      yPos += lineHeight;
+      pdf.text(`Period: Last 7 Days`, margin, yPos);
+      yPos += 12;
+
+      // Overall Trend
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      const trendText = overallTrend === "up" ? "📈 Improving" : overallTrend === "down" ? "📉 Declining" : "➡️ Stable";
+      pdf.text(`Overall Trend: ${trendText}`, margin, yPos);
+      yPos += 12;
+
+      // Weekly Summary
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Weekly Summary", margin, yPos);
+      yPos += lineHeight;
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`• Study Sessions: ${weeklyStats.totalSessions}`, margin + 5, yPos);
+      yPos += lineHeight;
+      pdf.text(`• Time Spent: ${Math.round(weeklyStats.totalTimeSpent / 60)} minutes`, margin + 5, yPos);
+      yPos += lineHeight;
+      pdf.text(`• Quizzes Taken: ${weeklyStats.totalQuizzes}`, margin + 5, yPos);
+      yPos += lineHeight;
+      pdf.text(`• Average Accuracy: ${weeklyStats.avgAccuracy}%`, margin + 5, yPos);
+      yPos += 12;
+
+      // Subjects Studied
+      if (subjectsStudied.length > 0) {
+        checkPageBreak(20);
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Subjects Studied", margin, yPos);
+        yPos += lineHeight;
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`• ${subjectsStudied.join(", ")}`, margin + 5, yPos);
+        yPos += 12;
+      }
+
+      // Understanding Levels
+      if (Object.keys(understandingDist).length > 0) {
+        checkPageBreak(30);
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Understanding Levels", margin, yPos);
+        yPos += lineHeight;
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "normal");
+        Object.entries(understandingDist).forEach(([level, count]) => {
+          pdf.text(`• ${level.charAt(0).toUpperCase() + level.slice(1)}: ${count} sessions`, margin + 5, yPos);
+          yPos += lineHeight;
+        });
+        yPos += 5;
+      }
+
+      // Weak Areas
+      if (topWeakAreas.length > 0) {
+        checkPageBreak(30);
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Areas Needing Improvement", margin, yPos);
+        yPos += lineHeight;
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "normal");
+        topWeakAreas.forEach(([area, count]) => {
+          pdf.text(`• ${area} (mentioned ${count}x)`, margin + 5, yPos);
+          yPos += lineHeight;
+        });
+        yPos += 5;
+      }
+
+      // Strong Areas
+      if (topStrongAreas.length > 0) {
+        checkPageBreak(30);
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Strong Areas", margin, yPos);
+        yPos += lineHeight;
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "normal");
+        topStrongAreas.forEach(([area, count]) => {
+          pdf.text(`• ${area} (mentioned ${count}x)`, margin + 5, yPos);
+          yPos += lineHeight;
+        });
+        yPos += 5;
+      }
+
+      // Recent Quiz Results
+      if (quizzes.length > 0) {
+        checkPageBreak(40);
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Recent Quiz Results", margin, yPos);
+        yPos += lineHeight;
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "normal");
+        quizzes.slice(0, 5).forEach((quiz) => {
+          checkPageBreak(lineHeight);
+          const date = new Date(quiz.created_at).toLocaleDateString("en-IN");
+          pdf.text(
+            `• ${date}: Score ${quiz.correct_count}/${quiz.total_questions} (${quiz.accuracy_percentage?.toFixed(0) || 0}%)`,
+            margin + 5,
+            yPos
+          );
+          yPos += lineHeight;
+        });
+        yPos += 5;
+      }
+
+      // AI Feedback
+      if (aiSummaries.length > 0) {
+        checkPageBreak(40);
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("AI Feedback Summary", margin, yPos);
+        yPos += lineHeight;
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        aiSummaries.forEach((summary) => {
+          checkPageBreak(20);
+          const lines = pdf.splitTextToSize(`"${summary}"`, contentWidth - 10);
+          lines.forEach((line: string) => {
+            pdf.text(line, margin + 5, yPos);
+            yPos += 5;
+          });
+          yPos += 5;
+        });
+      }
+
+      // Footer
+      checkPageBreak(20);
+      yPos = pdf.internal.pageSize.getHeight() - 15;
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "italic");
+      pdf.text("Generated by Edu Improvement AI", pageWidth / 2, yPos, { align: "center" });
+
+      // Save PDF
+      const fileName = `${studentName.replace(/\s+/g, "_")}_Report_${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(fileName);
+
+      toast({
+        title: "PDF Downloaded!",
+        description: `Report saved as ${fileName}`,
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Download Failed",
+        description: "Could not generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const getUnderstandingColor = (level: string) => {
     switch (level) {
       case "excellent":
@@ -223,6 +425,21 @@ const StudentReportModal = ({
                   <Minus className="w-4 h-4" /> Stable
                 </span>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf || loading}
+              >
+                {downloadingPdf ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </DialogHeader>

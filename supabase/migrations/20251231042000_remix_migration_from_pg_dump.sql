@@ -1,10 +1,10 @@
-CREATE EXTENSION IF NOT EXISTS "pg_cron" WITH SCHEMA "pg_catalog";
-CREATE EXTENSION IF NOT EXISTS "pg_graphql" WITH SCHEMA "graphql";
-CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
+CREATE EXTENSION IF NOT EXISTS "pg_cron";
+CREATE EXTENSION IF NOT EXISTS "pg_graphql";
+CREATE EXTENSION IF NOT EXISTS "pg_net";
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA "extensions";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
-CREATE EXTENSION IF NOT EXISTS "plpgsql" WITH SCHEMA "pg_catalog";
-CREATE EXTENSION IF NOT EXISTS "supabase_vault" WITH SCHEMA "vault";
+CREATE EXTENSION IF NOT EXISTS "plpgsql";
+CREATE EXTENSION IF NOT EXISTS "supabase_vault";
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 BEGIN;
 
@@ -174,7 +174,11 @@ CREATE TABLE public.schools (
     password_hash text NOT NULL,
     district text,
     state text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_banned boolean DEFAULT false,
+    fee_paid boolean DEFAULT true,
+    email text,
+    contact_whatsapp text
 );
 
 
@@ -196,7 +200,12 @@ CREATE TABLE public.students (
     district text NOT NULL,
     state text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_approved boolean DEFAULT false NOT NULL,
+    approved_at timestamp with time zone,
+    approved_by uuid,
+    rejection_reason text,
+    is_banned boolean DEFAULT false
 );
 
 
@@ -299,6 +308,34 @@ ALTER TABLE ONLY public.students
 
 ALTER TABLE ONLY public.study_sessions
     ADD CONSTRAINT study_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_schools_banned; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_schools_banned ON public.schools USING btree (is_banned);
+
+
+--
+-- Name: idx_schools_fee_paid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_schools_fee_paid ON public.schools USING btree (fee_paid);
+
+
+--
+-- Name: idx_students_approval; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_approval ON public.students USING btree (school_id, is_approved);
+
+
+--
+-- Name: idx_students_banned; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_students_banned ON public.students USING btree (is_banned);
 
 
 --

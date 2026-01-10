@@ -885,6 +885,8 @@ const SchoolDashboard = () => {
           studentName={selectedStudent.name}
           studentPhoto={selectedStudent.photo}
           studentClass={selectedStudent.class}
+          schoolId={schoolUuid || undefined}
+          userType="school"
         />
       )}
     </div>

@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, session_token, user_type, school_id } = await req.json();
+    const { action, session_token, user_type, school_id, student_id, student_class } = await req.json();
 
     // Create admin client to bypass RLS
     const supabaseAdmin = createClient(
@@ -20,7 +20,112 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Verify session token
+    // Handle student report data request
+    if (action === 'get_student_report') {
+      // Verify session - either school or admin
+      let isAuthorized = false;
+      
+      if (user_type === 'school' && school_id) {
+        const { data: school } = await supabaseAdmin
+          .from('schools')
+          .select('id')
+          .eq('id', school_id)
+          .maybeSingle();
+        isAuthorized = !!school;
+      } else if (user_type === 'admin') {
+        const adminId = session_token?.split('_')[1];
+        const { data: admin } = await supabaseAdmin
+          .from('admins')
+          .select('id')
+          .eq('id', adminId)
+          .maybeSingle();
+        isAuthorized = !!admin;
+      }
+
+      if (!isAuthorized) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Load student info with school
+      const { data: studentData } = await supabaseAdmin
+        .from('students')
+        .select('*, schools(*)')
+        .eq('id', student_id)
+        .maybeSingle();
+
+      // Load study sessions from last 7 days
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      const { data: sessionsData } = await supabaseAdmin
+        .from('study_sessions')
+        .select('*')
+        .eq('student_id', student_id)
+        .gte('created_at', weekAgo.toISOString())
+        .order('created_at', { ascending: false });
+
+      const { data: quizzesData } = await supabaseAdmin
+        .from('quiz_attempts')
+        .select('*')
+        .eq('student_id', student_id)
+        .gte('created_at', weekAgo.toISOString())
+        .order('created_at', { ascending: false });
+
+      // Load class averages for comparison
+      let classAverages = null;
+      if (student_class) {
+        const { data: classStudents } = await supabaseAdmin
+          .from('students')
+          .select('id')
+          .eq('class', student_class);
+
+        if (classStudents && classStudents.length > 0) {
+          const studentIds = classStudents.map((s: any) => s.id);
+
+          const { data: classSessions } = await supabaseAdmin
+            .from('study_sessions')
+            .select('*')
+            .in('student_id', studentIds)
+            .gte('created_at', weekAgo.toISOString());
+
+          const { data: classQuizzes } = await supabaseAdmin
+            .from('quiz_attempts')
+            .select('*')
+            .in('student_id', studentIds)
+            .gte('created_at', weekAgo.toISOString());
+
+          const studentCount = classStudents.length;
+          const totalSessions = classSessions?.length || 0;
+          const totalQuizzes = classQuizzes?.length || 0;
+          const totalTimeSpent = classSessions?.reduce((acc: number, s: any) => acc + (s.time_spent || 0), 0) || 0;
+          const totalAccuracy = classQuizzes?.reduce((acc: number, q: any) => acc + (q.accuracy_percentage || 0), 0) || 0;
+          const totalImprovementScore = classSessions?.reduce((acc: number, s: any) => acc + (s.improvement_score || 50), 0) || 0;
+
+          classAverages = {
+            avgSessions: Math.round((totalSessions / studentCount) * 10) / 10,
+            avgTimeSpent: Math.round(totalTimeSpent / studentCount),
+            avgAccuracy: totalQuizzes > 0 ? Math.round(totalAccuracy / totalQuizzes) : 0,
+            avgQuizzes: Math.round((totalQuizzes / studentCount) * 10) / 10,
+            avgImprovementScore: totalSessions > 0 ? Math.round(totalImprovementScore / totalSessions) : 50,
+          };
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          student: studentData,
+          sessions: sessionsData || [],
+          quizzes: quizzesData || [],
+          classAverages,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify session token for list operations
     if (user_type === 'school') {
       // Verify school session
       const { data: school, error } = await supabaseAdmin

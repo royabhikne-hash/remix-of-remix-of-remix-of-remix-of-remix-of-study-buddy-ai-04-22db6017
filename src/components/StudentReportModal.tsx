@@ -68,6 +68,7 @@ interface StudentReportModalProps {
   studentPhoto?: string;
   studentClass: string;
   schoolId?: string;
+  userType?: "student" | "school" | "admin";
 }
 
 interface SessionData {
@@ -114,6 +115,7 @@ const StudentReportModal = ({
   studentPhoto,
   studentClass,
   schoolId,
+  userType = "student",
 }: StudentReportModalProps) => {
   const { toast } = useToast();
   const [sessions, setSessions] = useState<SessionData[]>([]);
@@ -135,44 +137,83 @@ const StudentReportModal = ({
   const loadStudentData = async () => {
     setLoading(true);
     try {
-      // Load student info with school
-      const { data: studentData } = await supabase
-        .from("students")
-        .select("*, schools(*)")
-        .eq("id", studentId)
-        .maybeSingle();
-
-      if (studentData?.schools) {
-        setSchoolInfo({
-          name: (studentData.schools as any).name,
-          district: (studentData.schools as any).district,
-          state: (studentData.schools as any).state,
+      // Use edge function for school/admin to bypass RLS
+      if (userType === "school" || userType === "admin") {
+        const sessionToken = userType === "admin" 
+          ? `admin_${localStorage.getItem("adminId")}_${localStorage.getItem("adminSessionToken")}`
+          : localStorage.getItem("schoolSessionToken");
+        
+        const { data, error } = await supabase.functions.invoke("get-students", {
+          body: {
+            action: "get_student_report",
+            user_type: userType,
+            session_token: sessionToken,
+            school_id: schoolId || localStorage.getItem("schoolUuid"),
+            student_id: studentId,
+            student_class: studentClass,
+          },
         });
+
+        if (error) {
+          console.error("Error fetching student report:", error);
+          setLoading(false);
+          return;
+        }
+
+        if (data?.student?.schools) {
+          setSchoolInfo({
+            name: data.student.schools.name,
+            district: data.student.schools.district,
+            state: data.student.schools.state,
+          });
+        }
+
+        setSessions(data?.sessions || []);
+        setQuizzes(data?.quizzes || []);
+        
+        if (data?.classAverages) {
+          setClassAverages(data.classAverages);
+        }
+      } else {
+        // Student viewing own data - use direct Supabase queries
+        const { data: studentData } = await supabase
+          .from("students")
+          .select("*, schools(*)")
+          .eq("id", studentId)
+          .maybeSingle();
+
+        if (studentData?.schools) {
+          setSchoolInfo({
+            name: (studentData.schools as any).name,
+            district: (studentData.schools as any).district,
+            state: (studentData.schools as any).state,
+          });
+        }
+
+        // Load study sessions from last 7 days
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
+        const { data: sessionsData } = await supabase
+          .from("study_sessions")
+          .select("*")
+          .eq("student_id", studentId)
+          .gte("created_at", weekAgo.toISOString())
+          .order("created_at", { ascending: false });
+
+        const { data: quizzesData } = await supabase
+          .from("quiz_attempts")
+          .select("*")
+          .eq("student_id", studentId)
+          .gte("created_at", weekAgo.toISOString())
+          .order("created_at", { ascending: false });
+
+        setSessions(sessionsData || []);
+        setQuizzes(quizzesData || []);
+
+        // Load class averages for comparison
+        await loadClassAverages(weekAgo);
       }
-
-      // Load study sessions from last 7 days
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-
-      const { data: sessionsData } = await supabase
-        .from("study_sessions")
-        .select("*")
-        .eq("student_id", studentId)
-        .gte("created_at", weekAgo.toISOString())
-        .order("created_at", { ascending: false });
-
-      const { data: quizzesData } = await supabase
-        .from("quiz_attempts")
-        .select("*")
-        .eq("student_id", studentId)
-        .gte("created_at", weekAgo.toISOString())
-        .order("created_at", { ascending: false });
-
-      setSessions(sessionsData || []);
-      setQuizzes(quizzesData || []);
-
-      // Load class averages for comparison
-      await loadClassAverages(weekAgo);
     } catch (error) {
       console.error("Error loading student data:", error);
     } finally {

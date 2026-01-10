@@ -1091,6 +1091,7 @@ const AdminDashboard = () => {
           studentName={selectedStudent.full_name}
           studentPhoto={selectedStudent.photo_url}
           studentClass={selectedStudent.class}
+          userType="admin"
         />
       )}
     </div>

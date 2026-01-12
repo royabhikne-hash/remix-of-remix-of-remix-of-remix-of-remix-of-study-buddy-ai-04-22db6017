@@ -312,8 +312,8 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     });
   };
 
-  // Web Speech API for natural male Hindi voice
-  const speakText = (text: string, messageId: string) => {
+  // Enhanced Web Speech API for natural Hindi voice with better quality
+  const speakText = (text: string, messageId: string, isQuizQuestion: boolean = false) => {
     // If already speaking this message, stop
     if (speakingMessageId === messageId) {
       window.speechSynthesis.cancel();
@@ -324,7 +324,14 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     // Stop any ongoing speech
     window.speechSynthesis.cancel();
 
-    const cleanText = text.replace(/[🎉📚💪🤖👋✓✔❌⚠️🙏👍💡🎯📊📈📉🔥⭐]/g, '').trim();
+    // Clean text and handle Hinglish better
+    let cleanText = text
+      .replace(/[🎉📚💪🤖👋✓✔❌⚠️🙏👍💡🎯📊📈📉🔥⭐🎓📖💯✨🏆]/g, '')
+      .replace(/\*\*/g, '') // Remove markdown bold
+      .replace(/\*/g, '')   // Remove asterisks
+      .replace(/_/g, '')    // Remove underscores
+      .replace(/#{1,6}\s/g, '') // Remove markdown headers
+      .trim();
     
     if (!cleanText) return;
     
@@ -332,20 +339,28 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     
     try {
       const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      // Use Hindi for better Hinglish pronunciation
       utterance.lang = 'hi-IN';
-      utterance.rate = voiceSpeed;
-      utterance.pitch = 0.9; // Slightly lower pitch for male voice
+      
+      // Adjust rate based on context - slower for quiz questions for better clarity
+      utterance.rate = isQuizQuestion ? Math.max(voiceSpeed - 0.1, 0.7) : voiceSpeed;
+      
+      // Natural pitch settings
+      utterance.pitch = 1.0;
       utterance.volume = 1.0;
       
       const voices = window.speechSynthesis.getVoices();
       
-      // Prefer male Hindi voices for natural sound
+      // Priority order for voice selection - prefer Google/Microsoft natural voices
       const preferredVoice = 
-        voices.find(v => v.lang.includes('hi') && v.name.toLowerCase().includes('male')) ||
+        voices.find(v => v.lang === 'hi-IN' && v.name.includes('Google')) ||
+        voices.find(v => v.lang === 'hi-IN' && v.name.includes('Microsoft')) ||
+        voices.find(v => v.lang === 'hi-IN' && v.name.toLowerCase().includes('natural')) ||
         voices.find(v => v.lang === 'hi-IN' && !v.name.toLowerCase().includes('female')) ||
         voices.find(v => v.lang.includes('hi-IN')) ||
         voices.find(v => v.lang.includes('hi')) ||
-        voices.find(v => v.lang.includes('en-IN') && v.name.toLowerCase().includes('male')) ||
+        voices.find(v => v.lang === 'en-IN' && v.name.includes('Google')) ||
         voices.find(v => v.lang.includes('en-IN'));
       
       if (preferredVoice) {
@@ -357,15 +372,42 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         setSpeakingMessageId(null);
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        console.error("TTS error event:", e);
         setSpeakingMessageId(null);
       };
 
-      window.speechSynthesis.speak(utterance);
+      // Small delay for better audio quality
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 50);
     } catch (error) {
       console.error("TTS error:", error);
       setSpeakingMessageId(null);
     }
+  };
+
+  // Function to speak quiz question
+  const speakQuizQuestion = (question: QuizQuestion) => {
+    if (!autoSpeak) return;
+    
+    let questionText = `Question ${currentQuestionIndex + 1}. ${question.question}`;
+    
+    // Add options for MCQ
+    if (question.type === "mcq" && question.options) {
+      questionText += ". Options hain: ";
+      question.options.forEach((opt, idx) => {
+        questionText += `${String.fromCharCode(65 + idx)}, ${opt}. `;
+      });
+    } else if (question.type === "true_false") {
+      questionText += ". True ya False batao.";
+    } else {
+      questionText += ". Apna jawab likho.";
+    }
+    
+    setTimeout(() => {
+      speakText(questionText, `quiz-q-${question.id}`, true);
+    }, 500);
   };
 
   const getAIResponse = async (conversationHistory: ChatMessage[]) => {
@@ -539,7 +581,7 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     // Auto-speak after typing is complete
     if (autoSpeak && content) {
       setTimeout(() => {
-        speakText(content, messageId);
+        speakText(content, messageId, false);
       }, 200);
     }
   };
@@ -601,6 +643,18 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, quizIntro]);
+        
+        // Speak intro and first question after delay
+        if (autoSpeak) {
+          setTimeout(() => {
+            speakText(introMessage, `quiz-intro-${Date.now()}`, true);
+          }, 300);
+          
+          // Speak first question after intro
+          setTimeout(() => {
+            speakQuizQuestion(data.quiz.questions[0]);
+          }, 4000);
+        }
       } else {
         finishStudySession();
       }
@@ -693,7 +747,13 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
     setShowExplanation(false);
     
     if (currentQuestionIndex < quizQuestions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+      
+      // Speak the next question
+      if (quizQuestions[nextIndex]) {
+        speakQuizQuestion(quizQuestions[nextIndex]);
+      }
     } else {
       calculateQuizResults();
     }

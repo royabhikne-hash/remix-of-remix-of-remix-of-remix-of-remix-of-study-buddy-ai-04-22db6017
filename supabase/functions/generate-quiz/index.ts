@@ -98,49 +98,88 @@ ${chatContext || "General study session on " + (topic || "various topics")}
 
 Generate 12 adaptive questions that will thoroughly assess and help this student learn better.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-5-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate quiz questions for the study session on "${topic || 'General Study'}". The student's understanding level is ${studentLevel || 'average'}.` }
-        ],
-        max_completion_tokens: 3000,
-      }),
-    });
+    const PRIMARY_MODEL = "openai/gpt-5-mini";
+    const FALLBACK_MODEL = "google/gemini-3-flash-preview";
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    const quizMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `Generate quiz questions for the study session on "${topic || 'General Study'}". The student's understanding level is ${studentLevel || 'average'}.` }
+    ];
+
+    const callLovableAI = async (model: string) => {
+      const body: Record<string, unknown> = {
+        model,
+        messages: quizMessages,
+      };
+
+      // OpenAI GPT-5 models require max_completion_tokens (not max_tokens)
+      if (model.startsWith("openai/")) {
+        body.max_completion_tokens = 3000;
+      } else {
+        body.max_tokens = 3000;
       }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+
+      console.log(`Calling Lovable AI for quiz with model: ${model}`);
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error("AI gateway error:", resp.status, errorText);
+
+        if (resp.status === 429) {
+          return { errorResponse: new Response(
+            JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          )};
+        }
+
+        if (resp.status === 402) {
+          return { errorResponse: new Response(
+            JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          )};
+        }
+
+        throw new Error(`AI service error: ${resp.status}`);
       }
-      
-      throw new Error(`AI service error: ${response.status}`);
+
+      const data = await resp.json();
+      return { data };
+    };
+
+    let data: any;
+
+    // 1) Primary call (GPT-5-mini)
+    {
+      const result = await callLovableAI(PRIMARY_MODEL);
+      if (result.errorResponse) return result.errorResponse;
+      data = result.data;
     }
 
-    const data = await response.json();
-    let aiResponse = data.choices?.[0]?.message?.content;
+    let aiResponse = data?.choices?.[0]?.message?.content;
 
-    if (!aiResponse) {
-      console.error("No response content from AI:", data);
-      throw new Error("No response from AI");
+    // 2) If model returns empty content, retry with fallback model
+    if (typeof aiResponse !== "string" || aiResponse.trim().length === 0) {
+      console.error("No response content from primary AI, trying fallback:", data);
+
+      const result2 = await callLovableAI(FALLBACK_MODEL);
+      if (result2.errorResponse) return result2.errorResponse;
+
+      const data2 = result2.data;
+      aiResponse = data2?.choices?.[0]?.message?.content;
+
+      if (typeof aiResponse !== "string" || aiResponse.trim().length === 0) {
+        console.error("No response content from fallback AI:", data2);
+        throw new Error("No response from AI");
+      }
     }
 
     console.log("Quiz generation response received");

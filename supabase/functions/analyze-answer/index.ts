@@ -71,51 +71,94 @@ Student's Answer: ${studentAnswer}
 
 Is the student's answer correct or equivalent to the expected answer? Consider meaning over exact wording.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-5-nano",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        max_completion_tokens: 500,
-      }),
-    });
+    const PRIMARY_MODEL = "openai/gpt-5-nano";
+    const FALLBACK_MODEL = "google/gemini-2.5-flash-lite";
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
+    const analyzeMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ];
+
+    const callLovableAI = async (model: string) => {
+      const body: Record<string, unknown> = {
+        model,
+        messages: analyzeMessages,
+      };
+
+      if (model.startsWith("openai/")) {
+        body.max_completion_tokens = 500;
+      } else {
+        body.max_tokens = 500;
+      }
+
+      console.log(`Calling Lovable AI for answer analysis with model: ${model}`);
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error("AI gateway error:", resp.status, errorText);
+
+        if (resp.status === 429) {
+          const isCorrect = studentAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+          return { 
+            fallbackResult: { 
+              isCorrect, 
+              confidence: 100, 
+              reasoning: isCorrect ? "Answer matches" : "Answer doesn't match",
+              feedback: isCorrect ? "Sahi jawab!" : "Galat jawab",
+              fallback: true
+            }
+          };
+        }
+
+        throw new Error(`AI service error: ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      return { data };
+    };
+
+    let data: any;
+
+    // Primary call
+    {
+      const result = await callLovableAI(PRIMARY_MODEL);
+      if (result.fallbackResult) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded", isCorrect: studentAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim() }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify(result.fallbackResult),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      data = result.data;
+    }
+
+    let aiResponse = data?.choices?.[0]?.message?.content;
+
+    // Fallback if empty response
+    if (typeof aiResponse !== "string" || aiResponse.trim().length === 0) {
+      console.error("No response from primary AI, trying fallback:", data);
+      
+      const result2 = await callLovableAI(FALLBACK_MODEL);
+      if (result2.fallbackResult) {
+        return new Response(
+          JSON.stringify(result2.fallbackResult),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
-      // Fallback to simple matching
-      const isCorrect = studentAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
-      return new Response(
-        JSON.stringify({ 
-          isCorrect,
-          confidence: 100,
-          reasoning: isCorrect ? "Answer matches" : "Answer doesn't match",
-          feedback: isCorrect ? "Sahi jawab!" : "Galat jawab",
-          fallback: true
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const data2 = result2.data;
+      aiResponse = data2?.choices?.[0]?.message?.content;
     }
 
-    const data = await response.json();
-    let aiResponse = data.choices?.[0]?.message?.content;
-
-    if (!aiResponse) {
+    if (typeof aiResponse !== "string" || aiResponse.trim().length === 0) {
       console.error("No response from AI");
       throw new Error("No AI response");
     }

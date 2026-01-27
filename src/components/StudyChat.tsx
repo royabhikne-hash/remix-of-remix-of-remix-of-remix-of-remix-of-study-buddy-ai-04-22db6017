@@ -352,15 +352,21 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
       
       const voices = window.speechSynthesis.getVoices();
       
-      // Priority order for voice selection - prefer Google/Microsoft natural voices
+      // Priority order for voice selection - PREFER MALE VOICES
+      // Look for male voices explicitly first
       const preferredVoice = 
-        voices.find(v => v.lang === 'hi-IN' && v.name.includes('Google')) ||
-        voices.find(v => v.lang === 'hi-IN' && v.name.includes('Microsoft')) ||
-        voices.find(v => v.lang === 'hi-IN' && v.name.toLowerCase().includes('natural')) ||
-        voices.find(v => v.lang === 'hi-IN' && !v.name.toLowerCase().includes('female')) ||
-        voices.find(v => v.lang.includes('hi-IN')) ||
+        // Hindi male voices (highest priority)
+        voices.find(v => v.lang === 'hi-IN' && v.name.toLowerCase().includes('male')) ||
+        voices.find(v => v.lang === 'hi-IN' && (v.name.includes('Madhur') || v.name.includes('Hemant') || v.name.includes('Prabhat'))) ||
+        voices.find(v => v.lang === 'hi-IN' && v.name.includes('Google') && !v.name.toLowerCase().includes('female')) ||
+        voices.find(v => v.lang === 'hi-IN' && v.name.includes('Microsoft') && !v.name.toLowerCase().includes('female')) ||
+        // Hindi voices that are NOT female
+        voices.find(v => v.lang === 'hi-IN' && !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('woman')) ||
+        // English Indian male voices
+        voices.find(v => v.lang === 'en-IN' && v.name.toLowerCase().includes('male')) ||
+        voices.find(v => v.lang === 'en-IN' && (v.name.includes('Ravi') || v.name.includes('Google') && !v.name.toLowerCase().includes('female'))) ||
+        // Any Hindi voice
         voices.find(v => v.lang.includes('hi')) ||
-        voices.find(v => v.lang === 'en-IN' && v.name.includes('Google')) ||
         voices.find(v => v.lang.includes('en-IN'));
       
       if (preferredVoice) {
@@ -842,51 +848,51 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
   const currentQuestion = quizQuestions[currentQuestionIndex];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-60px)] bg-gradient-to-b from-background to-muted/20">
+    <div className="flex flex-col h-[100dvh] sm:h-[calc(100vh-60px)] bg-gradient-to-b from-background to-muted/20">
       {/* Confetti Celebration */}
       <Confetti trigger={showConfetti} onComplete={() => setShowConfetti(false)} />
-      {/* Enhanced ChatGPT-style Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/95 backdrop-blur-sm shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
-            <Bot className="w-5 h-5 text-white" />
+      {/* Enhanced ChatGPT-style Header - Mobile Optimized */}
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border/50 bg-card/95 backdrop-blur-sm shadow-sm sticky top-0 z-10">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+            <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-foreground">AI Study Buddy</h3>
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <h3 className="font-bold text-foreground text-sm sm:text-base">Study Buddy</h3>
+            <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
               {isQuizMode ? (
                 <span className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
-                  Quiz Mode • Question {currentQuestionIndex + 1}/{quizQuestions.length}
+                  Q {currentQuestionIndex + 1}/{quizQuestions.length}
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
-                  {currentTopic || "Ready to help!"}
+                  {currentTopic || "Ready!"}
                 </span>
               )}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Voice Speed Control */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Voice Speed Control - Mobile Optimized */}
           <Popover>
             <PopoverTrigger asChild>
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-muted-foreground hover:text-foreground h-8 px-2 gap-1"
+                className="text-muted-foreground hover:text-foreground h-7 sm:h-8 px-1.5 sm:px-2 gap-0.5 sm:gap-1"
               >
-                <Settings2 className="w-4 h-4" />
-                <span className="text-xs">{voiceSpeed}x</span>
+                <Settings2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="text-[10px] sm:text-xs">{voiceSpeed}x</span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-56 p-4" align="end">
-              <div className="space-y-4">
-                <div className="space-y-3">
+            <PopoverContent className="w-52 sm:w-56 p-3 sm:p-4" align="end">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="space-y-2 sm:space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Voice Speed</span>
-                    <span className="text-sm text-muted-foreground">{voiceSpeed}x</span>
+                    <span className="text-xs sm:text-sm font-medium">Voice Speed</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">{voiceSpeed}x</span>
                   </div>
                   <Slider
                     value={[voiceSpeed]}
@@ -896,22 +902,22 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
                     step={0.1}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground">
                     <span>Slow</span>
                     <span>Fast</span>
                   </div>
                 </div>
-                <div className="border-t border-border pt-3">
+                <div className="border-t border-border pt-2 sm:pt-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Auto-speak</span>
+                    <span className="text-xs sm:text-sm font-medium">Auto-speak</span>
                     <button
                       onClick={() => setAutoSpeak(!autoSpeak)}
-                      className={`w-10 h-5 rounded-full transition-colors relative ${autoSpeak ? 'bg-primary' : 'bg-muted'}`}
+                      className={`w-9 sm:w-10 h-5 rounded-full transition-colors relative ${autoSpeak ? 'bg-primary' : 'bg-muted'}`}
                     >
-                      <span className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-all ${autoSpeak ? 'left-5' : 'left-0.5'}`} />
+                      <span className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-all ${autoSpeak ? 'left-4 sm:left-5' : 'left-0.5'}`} />
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Auto read AI responses</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Auto read AI responses</p>
                 </div>
               </div>
             </PopoverContent>
@@ -920,9 +926,9 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
             variant="ghost" 
             size="sm" 
             onClick={() => setShowAnalysis(!showAnalysis)}
-            className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 sm:h-8 sm:w-8 p-0"
           >
-            <Brain className="w-4 h-4" />
+            <Brain className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </Button>
           {!isQuizMode && (
             <Button 
@@ -930,7 +936,7 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
               size="sm" 
               onClick={handleEndStudyClick}
               disabled={quizLoading}
-              className="h-8 px-3 text-xs"
+              className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs"
             >
               {quizLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "End"}
             </Button>
@@ -938,12 +944,12 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         </div>
       </div>
 
-      {/* Analysis Panel */}
+      {/* Analysis Panel - Mobile Optimized */}
       {showAnalysis && (
-        <div className="px-4 py-3 bg-muted/50 border-b border-border">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-muted-foreground">Understanding:</span>
-            <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${
+        <div className="px-3 sm:px-4 py-2 sm:py-3 bg-muted/50 border-b border-border">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+            <span className="text-muted-foreground">Level:</span>
+            <span className={`font-medium px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${
               analysis.currentUnderstanding === "excellent" ? "bg-accent/20 text-accent" :
               analysis.currentUnderstanding === "good" ? "bg-primary/20 text-primary" :
               analysis.currentUnderstanding === "average" ? "bg-warning/20 text-warning" :
@@ -952,21 +958,21 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
               {analysis.currentUnderstanding}
             </span>
             {analysis.strongAreas.length > 0 && (
-              <span className="text-accent flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> {analysis.strongAreas.slice(0, 2).join(", ")}
+              <span className="text-accent flex items-center gap-1 text-[10px] sm:text-xs">
+                <TrendingUp className="w-3 h-3" /> {analysis.strongAreas.slice(0, 1).join(", ")}
               </span>
             )}
             {analysis.weakAreas.length > 0 && (
-              <span className="text-warning flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> {analysis.weakAreas.slice(0, 2).join(", ")}
+              <span className="text-warning flex items-center gap-1 text-[10px] sm:text-xs">
+                <AlertTriangle className="w-3 h-3" /> {analysis.weakAreas.slice(0, 1).join(", ")}
               </span>
             )}
           </div>
         </div>
       )}
 
-      {/* ChatGPT-style Messages */}
-      <div className="flex-1 overflow-y-auto">
+      {/* ChatGPT-style Messages - Mobile Optimized */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
         {messages.map((message) => {
           const reactions = messageReactions[message.id];
           const isUser = message.role === "user";
@@ -974,25 +980,25 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
           return (
             <div
               key={message.id}
-              className={`py-5 px-4 ${isUser ? "bg-background" : "bg-muted/20"} transition-colors`}
+              className={`py-3 sm:py-5 px-3 sm:px-4 ${isUser ? "bg-background" : "bg-muted/20"} transition-colors`}
             >
-              <div className="max-w-3xl mx-auto flex gap-4">
-                {/* Avatar */}
-                <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm ${
+              <div className="max-w-3xl mx-auto flex gap-2 sm:gap-4">
+                {/* Avatar - Smaller on mobile */}
+                <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm ${
                   isUser 
                     ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground" 
                     : "bg-gradient-to-br from-accent/80 to-accent text-white"
                 }`}>
-                  {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                  {isUser ? <User className="w-3 h-3 sm:w-4 sm:h-4" /> : <Bot className="w-3 h-3 sm:w-4 sm:h-4" />}
                 </div>
                 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="font-semibold text-sm">
-                      {isUser ? "You" : "AI Study Buddy"}
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                    <span className="font-semibold text-xs sm:text-sm">
+                      {isUser ? "You" : "Study Buddy"}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">
                       {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
@@ -1001,11 +1007,11 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
                     <img
                       src={message.imageUrl}
                       alt="Uploaded"
-                      className="max-w-[200px] rounded-xl mb-3 shadow-sm border border-border/50"
+                      className="max-w-[150px] sm:max-w-[200px] rounded-xl mb-2 sm:mb-3 shadow-sm border border-border/50"
                     />
                   )}
                   
-                  <div className="text-foreground whitespace-pre-wrap leading-relaxed text-[15px]">
+                  <div className="text-foreground whitespace-pre-wrap leading-relaxed text-[13px] sm:text-[15px]">
                     {!isUser && message.isTyping && typingMessageId === message.id ? (
                       <TypingText 
                         text={message.content} 
@@ -1017,50 +1023,50 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
                     )}
                   </div>
                   
-                  {/* AI message actions */}
+                  {/* AI message actions - Compact on mobile */}
                   {!isUser && (
-                    <div className="flex items-center gap-1 mt-3">
+                    <div className="flex items-center gap-0.5 sm:gap-1 mt-2 sm:mt-3">
                       <button
                         onClick={() => speakText(message.content, message.id)}
-                        className="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1"
+                        className="p-1 sm:p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-0.5 sm:gap-1"
                         title={speakingMessageId === message.id ? "Stop speaking" : "Read aloud"}
                       >
                         {speakingMessageId === message.id ? (
                           <>
-                            <VolumeX className="w-4 h-4 text-primary" />
-                            <SoundWave isActive={true} className="ml-1" />
+                            <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+                            <SoundWave isActive={true} className="ml-0.5 sm:ml-1" />
                           </>
                         ) : (
-                          <Volume2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                          <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground hover:text-foreground" />
                         )}
                       </button>
-                      <div className="w-px h-4 bg-border mx-1" />
+                      <div className="w-px h-3 sm:h-4 bg-border mx-0.5 sm:mx-1" />
                       <button
                         onClick={() => handleReaction(message.id, "like")}
-                        className={`p-1.5 rounded transition-colors ${
+                        className={`p-1 sm:p-1.5 rounded transition-colors ${
                           reactions?.like?.userReacted ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground hover:text-foreground"
                         }`}
                         title="Like"
                       >
-                        <ThumbsUp className="w-4 h-4" />
+                        <ThumbsUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                       <button
                         onClick={() => handleReaction(message.id, "helpful")}
-                        className={`p-1.5 rounded transition-colors ${
+                        className={`p-1 sm:p-1.5 rounded transition-colors ${
                           reactions?.helpful?.userReacted ? "bg-accent/10 text-accent" : "hover:bg-muted text-muted-foreground hover:text-foreground"
                         }`}
                         title="Helpful"
                       >
-                        <Lightbulb className="w-4 h-4" />
+                        <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                       <button
                         onClick={() => handleReaction(message.id, "confusing")}
-                        className={`p-1.5 rounded transition-colors ${
+                        className={`p-1 sm:p-1.5 rounded transition-colors ${
                           reactions?.confusing?.userReacted ? "bg-warning/10 text-warning" : "hover:bg-muted text-muted-foreground hover:text-foreground"
                         }`}
                         title="Confusing"
                       >
-                        <HelpCircle className="w-4 h-4" />
+                        <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   )}
@@ -1285,11 +1291,11 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
         </div>
       )}
 
-      {/* ChatGPT-style Input - Clean rounded pill with voice input */}
+      {/* ChatGPT-style Input - Mobile Optimized */}
       {!isQuizMode && (
-        <div className="border-t border-border/50 bg-background p-3">
+        <div className="border-t border-border/50 bg-background p-2 sm:p-3 pb-safe">
           <div className="max-w-2xl mx-auto">
-            <div className="flex items-center gap-2 bg-muted/50 border border-border/50 rounded-full px-3 py-2 focus-within:border-primary/50 transition-colors">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-muted/50 border border-border/50 rounded-full px-2 sm:px-3 py-1.5 sm:py-2 focus-within:border-primary/50 transition-colors">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1301,9 +1307,9 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                className="shrink-0 h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+                className="shrink-0 h-7 w-7 sm:h-8 sm:w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
               >
-                <Image className="w-4 h-4" />
+                <Image className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
               
               {/* Voice Input Button */}
@@ -1312,13 +1318,13 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
                   variant="ghost"
                   size="icon"
                   onClick={toggleListening}
-                  className={`shrink-0 h-8 w-8 rounded-full transition-colors ${
+                  className={`shrink-0 h-7 w-7 sm:h-8 sm:w-8 rounded-full transition-colors ${
                     isListening 
                       ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {isListening ? <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                 </Button>
               )}
               
@@ -1327,22 +1333,22 @@ const StudyChat = ({ onEndStudy, studentId }: StudyChatProps) => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-8 text-sm"
+                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-7 sm:h-8 text-xs sm:text-sm"
                 disabled={isLoading || isListening}
               />
               <Button
                 size="icon"
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() && !selectedImage}
-                className="shrink-0 h-8 w-8 rounded-full"
+                className="shrink-0 h-7 w-7 sm:h-8 sm:w-8 rounded-full"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {isLoading ? <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               </Button>
             </div>
             {isListening && (
-              <div className="flex flex-col items-center gap-2 mt-3">
+              <div className="flex flex-col items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3">
                 <VoiceInputIndicator isActive={isListening} />
-                <p className="text-xs text-muted-foreground animate-pulse">
+                <p className="text-[10px] sm:text-xs text-muted-foreground animate-pulse">
                   Bol dijiye... main sun raha hoon
                 </p>
               </div>

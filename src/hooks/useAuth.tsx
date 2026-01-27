@@ -20,36 +20,63 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let initialLoadComplete = false;
 
-    // Set up auth state listener FIRST
+    // Initialize auth - get existing session first
+    const initializeAuth = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.warn("Auth getSession error:", error);
+          // Only sign out if it's a refresh token error
+          if (error.message?.includes('refresh_token') || error.message?.includes('invalid')) {
+            await supabase.auth.signOut();
+          }
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(data.session);
+          setUser(data.session?.user ?? null);
+        }
+      } catch (err) {
+        console.error("Auth initialization error:", err);
+        setSession(null);
+        setUser(null);
+      } finally {
+        if (mounted) {
+          initialLoadComplete = true;
+          setLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener for ongoing changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // THEN check for existing session (and clean up bad refresh tokens)
-    (async () => {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (!mounted) return;
-
-      if (error) {
-        console.warn("Auth getSession error, clearing session:", error);
-        await supabase.auth.signOut();
+      
+      // Only update state after initial load is complete
+      // This prevents race conditions where listener fires before getSession completes
+      if (initialLoadComplete) {
+        console.log("Auth state change:", event);
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
+      
+      // Handle specific events
+      if (event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
-        setLoading(false);
-        return;
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log("Token refreshed successfully");
       }
+    });
 
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    })();
+    initializeAuth();
 
     return () => {
       mounted = false;

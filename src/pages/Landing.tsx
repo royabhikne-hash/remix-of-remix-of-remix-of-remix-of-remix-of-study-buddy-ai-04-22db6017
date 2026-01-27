@@ -16,9 +16,11 @@ const Landing = () => {
       <header className="container mx-auto py-4 px-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Study Buddy AI" 
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex-shrink-0 object-contain"
+            />
             <span className="text-base sm:text-xl font-bold text-foreground truncate">{t('app.name')}</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
